@@ -1,6 +1,7 @@
 <?php
-
 include("../../functions/function.php");
+include("../../functions/conection.php");
+include("../../functions/jdf.php");
 ?>
 
 <!DOCTYPE html>
@@ -16,7 +17,7 @@ include("../../functions/function.php");
   <!-- Bootstrap rtl -->
   <link rel="stylesheet" href="../template/dist/css/rtl.css">
   <!-- persian Date Picker -->
-  <link rel="stylesheet" href="../template/dist/css/persian-datepicker-0.4.5.min">
+  <link rel="stylesheet" href="../template/dist/css/persian-datepicker-0.4.5.min.css">
   <!-- Font Awesome -->
   <link rel="stylesheet" href="../template/bower_components/font-awesome/css/font-awesome.min.css">
   <!-- Ionicons -->
@@ -34,7 +35,8 @@ include("../../functions/function.php");
   <link rel="stylesheet" href="../template/bower_components/bootstrap-daterangepicker/daterangepicker.css">
   <!-- bootstrap wysihtml5 - text editor -->
   <link rel="stylesheet" href="../template/plugins/bootstrap-wysihtml5/bootstrap3-wysihtml5.min.css">
-
+  <script src="../template/dist/js/persian-date-0.1.8.min.js"></script>
+  <script src="../template/dist/js/persian-datepicker-0.4.5.min.js"></script>
   <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
   <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
   <!--[if lt IE 9]>
@@ -44,16 +46,116 @@ include("../../functions/function.php");
 
   <!-- Google Font -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700,300italic,400italic,600italic">
-<body class="hold-transition skin-blue sidebar-mini">
+  </head>
+  <body class="hold-transition skin-blue sidebar-mini">
 <div class="wrapper">
 
 <?php
 @includepage("../inc_template/header");
 @includepage("../inc_template/menu_cop2");
 
+$departements = mysqli_query($Connect,"SELECT department_id ,name FROM department");
+if(isset($_POST['submit'])){
+  if(!$_POST['user_name']== '' &&!$_POST['first_name'] == '' && !$_POST['department_id']== '' && !$_POST['last_name']== ''&& !$_POST['start_date'] == ''&&  !$_POST['Ssn']== ''){
+    function convertToMiladi($date){
+      $list = explode('/', $date);
+      return jalali_to_gregorian($list[0], $list[1], $list[2],'/');
+    };
+    $Ssn=$_POST['Ssn'];
+    $first_name= $_POST['first_name'];
+    $department_id= $_POST['department_id'];
+    $last_name= $_POST['last_name'];
+    $start_date= convertToMiladi($_POST['start_date']);
+    $birth_date=convertToMiladi($_POST['birth_date']); 
+    $role= $_POST['role'];
+    $password=password_hash($Ssn,PASSWORD_DEFAULT);
+    $no_space_name=str_replace(" ", "", $_POST['first_name']);
+    $no_space_family=str_replace(" ", "", $_POST['last_name']);
+    $no_space_name_family=$no_space_name .= $no_space_family;
+    $gender=$_POST['gender'];
+    $marital_status=$_POST['marital_status'];
+    $address=$_POST['address'];
+    $mobile=$_POST['mobile'] ;
+    $house_phone_number=$_POST['house_phone_number'] ;
+    $user_name=$_POST['user_name'];
+    $email=$_POST['email'];
 
+    
+
+    function checkMeliCode($meli)
+      {    
+        $cDigitLast = substr($meli , strlen($meli)-1);
+        $fMeli = strval(intval($meli));
+      
+        if((str_split($fMeli))[0] == "0" && !(8 <= strlen($fMeli)  && strlen($fMeli) < 10)) return false;
+      
+        $nineLeftDigits = substr($meli , 0 , strlen($meli) - 1);
+        
+        $positionNumber = 10;
+        $result = 0;
+      
+        foreach(str_split($nineLeftDigits) as $chr){
+              $digit = intval($chr);
+              $result += $digit * $positionNumber;
+              $positionNumber--;
+        }
+      
+        $remain = $result % 11;
+      
+        $controllerNumber = $remain;
+      
+        if(2 < $remain){
+          $controllerNumber = 11-$remain;
+        }
+      
+        return $cDigitLast == $controllerNumber;
+        
+      }
+       !checkMeliCode($Ssn)? $invalid_national_code='کد ملی نامعتبر است.':$invalid_national_code='';
+      if(preg_match("/^09[0-9]{9}$/", $mobile)) {
+           $invalid_phone="";
+      }else{
+          $invalid_phone="شماره موبایل نامعتبر است.";
+      }
+     
+      $oldItems = mysqli_query($Connect,"SELECT * FROM employee where Ssn= $Ssn");
+      $checkrows=mysqli_num_rows($oldItems);
+      if( $checkrows > 0 ){
+        $duplicate_ssn="کد ملی تکراری است.";
+      }
+      else{
+        $duplicate_ssn="";
+      };
+      $oldItems = mysqli_query($Connect,"SELECT * FROM employee where employee_id= $user_name OR user_name= $user_name");
+      $checkrows=mysqli_num_rows($oldItems);
+      if( $checkrows > 0 ){
+        $duplicate_ssn="کد پرسنلی تکراری است.";
+      }
+      else{
+        $duplicate_ssn="";
+      };
+     
+      if($duplicate_ssn=='' && $invalid_phone=='' && $invalid_national_code==''){
+          $sql = "INSERT INTO employee (employee_id,department_id,first_name,no_space_name,last_name,no_space_family,no_space_name_family,Ssn,birth_date,start_date,gender, 
+          marital_staus,role,address,mobile,house_phone_number,user_name,password,email,photo) VALUES ('$user_name','$department_id','$first_name','$no_space_name','$last_name','$no_space_family','$no_space_name_family',' $Ssn','$birth_date','$start_date','$gender', 
+          '$marital_status',' $role','$address','$mobile','$house_phone_number','$user_name','$password','$email','null')"; 
+            if(mysqli_query($Connect, $sql)){ 
+              $successful_submit="اطلاعات با موفقیت ثبت شد.";
+              $unsuccessful_submit="";
+              // $sql = " INSERT INTO token_leave (employee_id, leave_id, start_date, end_date, comment, total_status)
+              // VALUES ('$employee_id', '$leave_type', '$start', '$end', '$comment', '$hours')";
+            }
+            else{
+              $successful_submit="";
+              $unsuccessful_submit="خطا در ثبت اطلاعات";
+            }
+        }
+      }
+      else{
+           $massagefalse=" لطفا گزینه‌های ستاره‌دار را پر کنید.";
+      }
+}
 ?>
-  
 
   <!-- Content Wrapper. Contains page content -->
   <div class="content-wrapper">
@@ -64,678 +166,187 @@ include("../../functions/function.php");
         <li><a href="#"><i class="fa fa-dashboard"></i> خانه</a></li>
         <li class="active">داشبورد</li>
       </ol>
+      <?php 
+        if(isset($invalid_national_code) && !$invalid_national_code==''){?>
+            <div class="alert alert-block alert-danger fade in">
+                <button data-dismiss="alert" class="close close-sm" type="button">
+                <i class="fa fa-remove"></i>
+                </button>
+                <strong>خطا</strong> 
+                <?=$invalid_national_code;?>
+            </div>
+          <?php
+        }?>
+      <?php 
+        if(isset($massagefalse) && !$massagefalse==''){?>
+            <div class="alert alert-block alert-danger fade in">
+                <button data-dismiss="alert" class="close close-sm" type="button">
+                <i class="fa fa-remove"></i>
+                </button>
+                <strong>خطا</strong> 
+                <?=$massagefalse;?>
+            </div>
+          <?php
+        }?>
+      <?php 
+        if(isset($duplicate_ssn) && !$duplicate_ssn==''){?>
+            <div class="alert alert-block alert-danger fade in">
+                <button data-dismiss="alert" class="close close-sm" type="button">
+                <i class="fa fa-remove"></i>
+                </button>
+                <strong>خطا</strong> 
+                <?=$duplicate_ssn;?>
+            </div>
+          <?php
+        }?>
+        <?php 
+        if(isset($invalid_phone) && !$invalid_phone==''){?>
+            <div class="alert alert-block alert-danger fade in">
+                <button data-dismiss="alert" class="close close-sm" type="button">
+                <i class="fa fa-remove"></i>
+                </button>
+                <strong>خطا</strong> 
+                <?=$invalid_phone;?>
+            </div>
+          <?php
+        }?>
+      <?php 
+        if(isset($unsuccessful_submit) && !$unsuccessful_submit==''){?>
+            <div class="alert alert-block alert-danger fade in">
+                <button data-dismiss="alert" class="close close-sm" type="button">
+                <i class="fa fa-remove"></i>
+                </button>
+                <strong>خطا</strong> 
+                <?=$unsuccessful_submit;?>
+            </div>
+          <?php
+        }?>
+        <?php 
+          if(isset($successful_submit) && !$successful_submit==''){?>
+            <div class="alert alert-success fade in">
+              <button data-dismiss="alert" class="close close-sm" type="button">
+              <i class="fa fa-remove"></i>
+              </button>
+              <?=$successful_submit;?>
+            </div>
+          <?php
+        }?>
+        
     </section>
-		<!-- Main content -->
-    <section class="content">
-      <div class="row">
-        <!-- left column -->
-        <div class="col-md-6">
-          <!-- general form elements -->
-          <div class="box box-primary">
-            <div class="box-header with-border">
-              <h3 class="box-title">مشخصات کاربر</h3>
-            </div>
-            <!-- /.box-header -->
-            <!-- form start -->
-            <form role="form">
-              <div class="box-body">
-                <div class="col-xs-5">
-                  <label for="exampleInputEmail1">نام</label>
-                  <input type="email" class="form-control" >
-                </div>
-                <div class="col-xs-5">
-                  <label for="exampleInputPassword1">نام خانوادگی</label>
-                  <input type="password" class="form-control">
-                </div>
-				  <div class="col-xs-5">
-					  <br>
-                  <label for="exampleInputPassword1"> کدملی</label>
-                  <input type="password" class="form-control">
-                </div>
-				  <div class="col-xs-5">
-					   <br>
-                  <label for="exampleInputPassword1">تاربخ تولد</label>
-                  <input type="password" class="form-control"  placeholder="      /   /    ">
-                </div>
-				   <div class="col-xs-5">
-					   <br>
-                  <label for="exampleInputPassword1"> شماره پرسنلی</label>
-                  <input type="password" class="form-control">
-                </div>
-				  <div class="col-xs-5">
-					   <br>
-                  <label for="exampleInputPassword1"> کد بخش</label>
-                  <input type="password" class="form-control">
-                </div>
-				  
-				  <div class="col-xs-5">
-					   <br>
-                  <label for="exampleInputPassword1">تاریخ استخدام</label>
-                  <input type="password" class="form-control"  placeholder="      /   /    ">
-                </div>
-				  
-				  <div class="col-xs-5">
-					   <br>
-                  <label for="exampleInputPassword1"> شماره تلفن همراه</label>
-                  <input type="password" class="form-control" placeholder="09121111111">
-                </div>
-				  <div class="col-xs-5">
-					   <br>
-                  <label for="exampleInputPassword1">شماره تلفن منزل</label>
-                  <input type="password" class="form-control" >
-                </div>
-				  
-				  <div class="col-xs-5">
-					   <br>
-                  <label for="exampleInputPassword1">شماره تلفن اضطراری</label>
-                  <input type="password" class="form-control">
-                </div>
-              <br>
-			    
-					    <br>
-				  <br>
-				   <br>
-				   
-					   <br>
-				  <br>
-				   <br>
-				   <br>
-					  <br>
-				  <br>
-				   <br>
-				   <br>
-					 <br>
-				  <br>
-				   <br>
-				   <br>
-				  <br>
-				   <br>
-				   <br>
-                <div class="form-group">
-                  <label>آدرس</label>
-                  <textarea class="form-control" rows="2" ></textarea>
-                </div>
-                
-                <div class="form-group">
-                  <label for="exampleInputFile">عکس </label>
-                  <input type="file" id="exampleInputFile">
-                </div>
-                
+    <form role="form"  name="form" method="POST">
+        <section class="content">
+          <div class="row">
+            <div class="box box-primary">
+              <div class="box-header with-border">
+                <h3 class="box-title">مشخصات کاربر</h3>
               </div>
-              <!-- /.box-body -->
-
-              <div class="box-body">
-                <button name="submit" type="submit" class="btn btn-primary">ارسال</button>
-              </div>
-            </form>
-          </div>
-          <!-- /.box -->
-
-          <!-- Form Element sizes -->
-          <div class="box box-success">
-            <div class="box-header with-border">
-              <h3 class="box-title">ارتفاع های مختلف</h3>
-            </div>
-            <div class="box-body">
-              <input class="form-control input-lg" type="text" placeholder=".input-lg">
-              <br>
-              <input class="form-control" type="text" placeholder="Default input">
-              <br>
-              <input class="form-control input-sm" type="text" placeholder=".input-sm">
-            </div>
-            <!-- /.box-body -->
-          </div>
-          <!-- /.box -->
-
-          <div class="box box-danger">
-            <div class="box-header with-border">
-              <h3 class="box-title">عرض های مختلف</h3>
-            </div>
-            <div class="box-body">
-              <div class="row">
-                <div class="col-xs-3">
-                  <input type="text" class="form-control" placeholder=".col-xs-3">
-                </div>
-                <div class="col-xs-4">
-                  <input type="text" class="form-control" placeholder=".col-xs-4">
-                </div>
-                <div class="col-xs-5">
-                  <input type="text" class="form-control" placeholder=".col-xs-5">
-                </div>
-              </div>
-            </div>
-            <!-- /.box-body -->
-          </div>
-          <!-- /.box -->
-
-          <!-- Input addon -->
-          <div class="box box-info">
-            <div class="box-header with-border">
-              <h3 class="box-title">ورودی ها</h3>
-            </div>
-            <div class="box-body">
-              <div class="input-group">
-                <span class="input-group-addon">@</span>
-                <input type="text" class="form-control" placeholder="نام کاربری">
-              </div>
-              <br>
-
-              <div class="input-group">
-                <input type="text" class="form-control">
-                <span class="input-group-addon">.00</span>
-              </div>
-              <br>
-
-              <div class="input-group">
-                <span class="input-group-addon">$</span>
-                <input type="text" class="form-control">
-                <span class="input-group-addon">.00</span>
-              </div>
-
-              <h4>With icons</h4>
-
-              <div class="input-group">
-                <span class="input-group-addon"><i class="fa fa-envelope"></i></span>
-                <input type="email" class="form-control" placeholder="ایمیل">
-              </div>
-              <br>
-
-              <div class="input-group">
-                <input type="text" class="form-control">
-                <span class="input-group-addon"><i class="fa fa-check"></i></span>
-              </div>
-              <br>
-
-              <div class="input-group">
-                <span class="input-group-addon"><i class="fa fa-dollar"></i></span>
-                <input type="text" class="form-control">
-                <span class="input-group-addon"><i class="fa fa-ambulance"></i></span>
-              </div>
-
-              <h4>به همراه چک باکس و رادیو</h4>
-
-              <div class="row">
-                <div class="col-lg-6">
-                  <div class="input-group">
-                        <span class="input-group-addon">
-                          <input type="checkbox">
-                        </span>
-                    <input type="text" class="form-control">
-                  </div>
-                  <!-- /input-group -->
-                </div>
-                <!-- /.col-lg-6 -->
-                <div class="col-lg-6">
-                  <div class="input-group">
-                        <span class="input-group-addon">
-                          <input type="radio">
-                        </span>
-                    <input type="text" class="form-control">
-                  </div>
-                  <!-- /input-group -->
-                </div>
-                <!-- /.col-lg-6 -->
-              </div>
-              <!-- /.row -->
-
-              <h4>همراه دکمه</h4>
-
-              <p class="margin">بزرگ: <code>input-group.input-group-lg</code></p>
-
-              <div class="input-group input-group-lg">
-                <div class="input-group-btn">
-                  <button type="button" class="btn btn-warning dropdown-toggle" data-toggle="dropdown">ارسال
-                    <span class="fa fa-caret-down"></span></button>
-                  <ul class="dropdown-menu">
-                    <li><a href="#">Action</a></li>
-                    <li><a href="#">Another action</a></li>
-                    <li><a href="#">Something else here</a></li>
-                    <li class="divider"></li>
-                    <li><a href="#">Separated link</a></li>
-                  </ul>
-                </div>
-                <!-- /btn-group -->
-                <input type="text" class="form-control">
-              </div>
-              <!-- /input-group -->
-              <p class="margin">معمولی</p>
-
-              <div class="input-group">
-                <div class="input-group-btn">
-                  <button type="button" class="btn btn-danger">ارسال</button>
-                </div>
-                <!-- /btn-group -->
-                <input type="text" class="form-control">
-              </div>
-              <!-- /input-group -->
-              <p class="margin">کوچک <code>input-group.input-group-sm</code></p>
-
-              <div class="input-group input-group-sm">
-                <input type="text" class="form-control">
-                    <span class="input-group-btn">
-                      <button type="button" class="btn btn-info btn-flat">ارسال</button>
-                    </span>
-              </div>
-              <!-- /input-group -->
-            </div>
-            <!-- /.box-body -->
-          </div>
-          <!-- /.box -->
-
-        </div>
-        <!--/.col (left) -->
-        <!-- right column -->
-        <div class="col-md-6">
-          <!-- Horizontal Form -->
-          <div class="box box-info">
-            <div class="box-header with-border">
-              <h3 class="box-title">فرم های عمودی</h3>
-            </div>
-            <!-- /.box-header -->
-            <!-- form start -->
-            <form class="form-horizontal">
-              <div class="box-body">
-                <div class="form-group">
-                  <label for="inputEmail3" class="col-sm-2 control-label">ایمیل</label>
-
-                  <div class="col-sm-10">
-                    <input type="email" class="form-control" id="inputEmail3" placeholder="ایمیل">
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="inputPassword3" class="col-sm-2 control-label">رمز عبور</label>
-
-                  <div class="col-sm-10">
-                    <input type="password" class="form-control" id="inputPassword3" placeholder="رمز عبور">
-                  </div>
-                </div>
-                <div class="form-group">
-                  <div class="col-sm-offset-2 col-sm-10">
-                    <div class="checkbox">
-                      <label>
-                        <input type="checkbox"> مرا به خاطر بسپار
-                      </label>
+              <form role="form">
+                  <div class="box-body">
+                    <div class="col-xs-4  pt-2">
+                      <label for="first_name">نام*</label>
+                      <input type="text" class="form-control w-50" id="first_name" name="first_name" >
+                    </div>
+                    <div class="col-xs-4  pt-2">
+                      <label for="last_name">نام خانوادگی*</label>
+                      <input type="text" class="form-control w-50" id="last_name" name="last_name">
+                    </div>
+                    <div class="col-xs-4  pt-2">
+                      <label for="Ssn"> کدملی*</label>
+                      <input type="text" class="form-control  w-50" id="Ssn" name="Ssn">
+                    </div>
+                    <div class="col-xs-4  pt-2">
+                      <label for="user_name"> کد پرسنلی*</label>
+                      <input type="text" class="form-control  w-50" id="user_name" name="user_name">
+                    </div>
+        
+                    <div class="col-xs-4  pt-2">
+                      <label for="birth_date">تاربخ تولد</label>
+                      <input type="text" class="form-control  w-50"   id="birth_date" name="birth_date">
+                    </div>
+                    
+                    <div class="col-xs-4  pt-2">
+                      <label for="department_id">  بخش*</label>
+                      <select  id="department_id"  class="form-control  w-50" name="department_id">
+                        <?php foreach ($departements as $departement) : ?>
+                            <option  value=<?php echo  $departement['department_id'] ?>><?php echo $departement['name'] ?></li>
+                        <?php endforeach ?>                         
+                      </select>   
+                    </div>     
+                    <div class="col-xs-4  pt-2">
+                      <label for="start_date">تاریخ استخدام*</label>
+                      <input type="text" class="form-control  w-50"  placeholder="      /   /    " id="start_date" name="start_date">
+                    </div>       
+                    <div class="col-xs-4  pt-2">
+                      <label for="mobile"> شماره تلفن همراه</label>
+                      <input type="tel" class="form-control  w-50" placeholder="09121111111" id="mobile" name="mobile">
+                    </div>
+                    <div class="col-xs-4  pt-2">
+                      <label for="house_phone_number">شماره تلفن منزل</label>
+                      <input type="tel" class="form-control  w-50" id="house_phone_number" name="house_phone_number">
+                    </div>  
+	  
+                    <div class="col-xs-4  pt-2">
+                      <label>وضعیت تاهل</label>
+                      <div class="form-group d-flex">   
+                          <label class="pl-3">
+                            <input type="radio" name="marital_status" id="2" value="2" checked>
+                              مجرد      
+                          </label>        
+                          <label>
+                            <input type="radio" name="marital_status" id="1" value="1">
+                            متاهل
+                          </label>
+                      </div>
+                    </div>
+                    <div class="col-xs-4  pt-2">
+                      <label>جنسیت</label>
+                      <div class="form-group d-flex">   
+                          <label class="pl-3">
+                            <input type="radio" name="gender" id="1" value="1" checked>
+                              زن      
+                          </label>        
+                          <label>
+                            <input type="radio" name="gender" id="2" value="2">
+                            مرد
+                          </label>
+                      </div>
+                    </div>
+                    <div class="col-xs-4  pt-2">     
+                      <label> نقش*</label>
+                      <div class="form-group d-flex">   
+                          <label class="pl-3">
+                            <input type="radio" name="role" id="2" value="2" checked>
+                              کاربر      
+                          </label>        
+                          <label>
+                            <input type="radio" name="role" id="1" value="1">
+                            ادمین
+                          </label>
+                      </div>
+                    </div>
+                    <div class="col-xs-4  pt-2"> 
+                      <label for="email">ایمیل</label>
+                      <div class="d-flex">
+                        <span class="input-group-addon"><i class="fa fa-envelope"></i></span>
+                        <input type="email" class="form-control w-50" placeholder="ایمیل" id="email" name="email">
+                      </div>
+                   </div>    		
+                    <div class="col-xs-4  pt-2"> 
+                      <label>آدرس</label>
+                      <textarea class="form-control" rows="2" id="address" name="address"></textarea>
                     </div>
                   </div>
-                </div>
-              </div>
-              <!-- /.box-body -->
-              <div class="box-footer">
-                <button type="submit" class="btn btn-default">انصراف</button>
-                <button type="submit" class="btn btn-info pull-right">ورود</button>
-              </div>
-              <!-- /.box-footer -->
-            </form>
-          </div>
-          <!-- /.box -->
-          <!-- general form elements disabled -->
-          <div class="box box-warning">
-            <div class="box-header with-border">
-              <h3 class="box-title">اجزای کلی</h3>
+                  <div class="box-body">
+                      <button name="submit" type="submit" class="btn btn-primary">ارسال</button>
+                  </div>    
+                </form>
             </div>
-            <!-- /.box-header -->
-            <div class="box-body">
-              <form role="form">
-                <!-- text input -->
-                <div class="form-group">
-                  <label>نوشته</label>
-                  <input type="text" class="form-control" placeholder="متن">
-                </div>
-                <div class="form-group">
-                  <label>غیر فعال</label>
-                  <input type="text" class="form-control" placeholder="متن" disabled>
-                </div>
-
-                <!-- textarea -->
-                <div class="form-group">
-                  <label>متن</label>
-                  <textarea class="form-control" rows="3" placeholder="متن"></textarea>
-                </div>
-                <div class="form-group">
-                  <label>متنی غیرفعال</label>
-                  <textarea class="form-control" rows="3" placeholder="متن" disabled></textarea>
-                </div>
-
-                <!-- input states -->
-                <div class="form-group has-success">
-                  <label class="control-label" for="inputSuccess"><i class="fa fa-check"></i> مقدار درست</label>
-                  <input type="text" class="form-control" id="inputSuccess" placeholder="متن">
-                  <span class="help-block">راهنمای ورودی</span>
-                </div>
-                <div class="form-group has-warning">
-                  <label class="control-label" for="inputWarning"><i class="fa fa-bell-o"></i> مقدار اشتباه</label>
-                  <input type="text" class="form-control" id="inputWarning" placeholder="متن">
-                  <span class="help-block">راهنمای ورودی</span>
-                </div>
-                <div class="form-group has-error">
-                  <label class="control-label" for="inputError"><i class="fa fa-times-circle-o"></i> مقدار درست نیست</label>
-                  <input type="text" class="form-control" id="inputError" placeholder="متن">
-                  <span class="help-block">راهنمای ورودی</span>
-                </div>
-
-                <!-- checkbox -->
-                <div class="form-group">
-                  <div class="checkbox">
-                    <label>
-                      <input type="checkbox">
-                      چک باکس 1
-                    </label>
-                  </div>
-
-                  <div class="checkbox">
-                    <label>
-                      <input type="checkbox">
-                      چک باکس 2
-                    </label>
-                  </div>
-
-                  <div class="checkbox">
-                    <label>
-                      <input type="checkbox" disabled>
-                      چک باکس غیرفعال
-                    </label>
-                  </div>
-                </div>
-
-                <!-- radio -->
-                <div class="form-group">
-                  <div class="radio">
-                    <label>
-                      <input type="radio" name="optionsRadios" id="optionsRadios1" value="option1" checked>
-                      رادیو گزینه ۱
-                    </label>
-                  </div>
-                  <div class="radio">
-                    <label>
-                      <input type="radio" name="optionsRadios" id="optionsRadios2" value="option2">
-                      رادیو گزینه ۲
-                    </label>
-                  </div>
-                  <div class="radio">
-                    <label>
-                      <input type="radio" name="optionsRadios" id="optionsRadios3" value="option3" disabled>
-                      رادیو گزینه غیرفعال
-                    </label>
-                  </div>
-                </div>
-
-                <!-- select -->
-                <div class="form-group">
-                  <label>انتخاب کنید</label>
-                  <select class="form-control">
-                    <option>گزینه 1</option>
-                    <option>گزینه 2</option>
-                    <option>گزینه 3</option>
-                    <option>گزینه 4</option>
-                    <option>گزینه 5</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>غیرفعال</label>
-                  <select class="form-control" disabled>
-                    <option>گزینه 1</option>
-                    <option>گزینه 2</option>
-                    <option>گزینه 3</option>
-                    <option>گزینه 4</option>
-                    <option>گزینه 5</option>
-                  </select>
-                </div>
-
-                <!-- Select multiple-->
-                <div class="form-group">
-                  <label>چند انتخابی</label>
-                  <select multiple class="form-control">
-                    <option>گزینه 1</option>
-                    <option>گزینه 2</option>
-                    <option>گزینه 3</option>
-                    <option>گزینه 4</option>
-                    <option>گزینه 5</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>غیرفعال</label>
-                  <select multiple class="form-control" disabled>
-                    <option>گزینه 1</option>
-                    <option>گزینه 2</option>
-                    <option>گزینه 3</option>
-                    <option>گزینه 4</option>
-                    <option>گزینه 5</option>
-                  </select>
-                </div>
-
-              </form>
-            </div>
-            <!-- /.box-body -->
           </div>
-          <!-- /.box -->
-        </div>
-        <!--/.col (right) -->
-      </div>
-      <!-- /.row -->
-    </section>
-    
-
-    <!-- Main content -->
-    <section class="content">
-      <!-- Small boxes (Stat box) -->
-      <div class="row"><!-- ./col --><!-- ./col -->
-        <!-- ./col -->
-        <!-- ./col -->
-      </div>
-      <!-- /.row -->
-      <div class="row"></div>
-      <!-- Main row -->
-      <div class="row">
-        <!-- right col --><!-- /.right col -->
-        <!-- left col (We are only adding the ID to make the widgets sortable)--><!-- left col -->
-      </div>
-      <!-- /.row (main row) -->
-
-    </section>
-    <!-- /.content -->
-  </div>
-  <!-- /.content-wrapper -->
-  <footer class="main-footer text-left"> 
-    <strong></a></strong>
-  </footer>
-
-  <!-- Control Sidebar -->
-  <aside class="control-sidebar control-sidebar-dark">
-    <!-- Create the tabs -->
-    <ul class="nav nav-tabs nav-justified control-sidebar-tabs">
-      <li><a href="#control-sidebar-home-tab" data-toggle="tab"><i class="fa fa-home"></i></a></li>
-      <li><a href="#control-sidebar-settings-tab" data-toggle="tab"><i class="fa fa-gears"></i></a></li>
-    </ul>
-    <!-- Tab panes -->
-    <div class="tab-content">
-      <!-- Home tab content -->
-      <div class="tab-pane" id="control-sidebar-home-tab">
-        <h3 class="control-sidebar-heading">فعالیت ها</h3>
-        <ul class="control-sidebar-menu">
-          <li>
-            <a href="javascript:void(0)">
-              <i class="menu-icon fa fa-birthday-cake bg-red"></i>
-
-              <div class="menu-info">
-                <h4 class="control-sidebar-subheading">تولد غلوم</h4>
-
-                <p>۲۴ مرداد</p>
-              </div>
-            </a>
-          </li>
-          <li>
-            <a href="javascript:void(0)">
-              <i class="menu-icon fa fa-user bg-yellow"></i>
-
-              <div class="menu-info">
-                <h4 class="control-sidebar-subheading">آپدیت پروفایل سجاد</h4>
-
-                <p>تلفن جدید (800)555-1234</p>
-              </div>
-            </a>
-          </li>
-          <li>
-            <a href="javascript:void(0)">
-              <i class="menu-icon fa fa-envelope-o bg-light-blue"></i>
-
-              <div class="menu-info">
-                <h4 class="control-sidebar-subheading">نورا به خبرنامه پیوست</h4>
-
-                <p>nora@example.com</p>
-              </div>
-            </a>
-          </li>
-          <li>
-            <a href="javascript:void(0)">
-              <i class="menu-icon fa fa-file-code-o bg-green"></i>
-
-              <div class="menu-info">
-                <h4 class="control-sidebar-subheading">کرون جابز اجرا شد</h4>
-
-                <p>۵ ثانیه پیش</p>
-              </div>
-            </a>
-          </li>
-        </ul>
-        <!-- /.control-sidebar-menu -->
-
-        <h3 class="control-sidebar-heading">پیشرفت کارها</h3>
-        <ul class="control-sidebar-menu">
-          <li>
-            <a href="javascript:void(0)">
-              <h4 class="control-sidebar-subheading">
-                ساخت پوستر های تبلیغاتی
-                <span class="label label-danger pull-left">70%</span>
-              </h4>
-
-              <div class="progress progress-xxs">
-                <div class="progress-bar progress-bar-danger" style="width: 70%"></div>
-              </div>
-            </a>
-          </li>
-          <li>
-            <a href="javascript:void(0)">
-              <h4 class="control-sidebar-subheading">
-                آپدیت رزومه
-                <span class="label label-success pull-left">95%</span>
-              </h4>
-
-              <div class="progress progress-xxs">
-                <div class="progress-bar progress-bar-success" style="width: 95%"></div>
-              </div>
-            </a>
-          </li>
-          <li>
-            <a href="javascript:void(0)">
-              <h4 class="control-sidebar-subheading">
-                آپدیت لاراول
-                <span class="label label-warning pull-left">50%</span>
-              </h4>
-
-              <div class="progress progress-xxs">
-                <div class="progress-bar progress-bar-warning" style="width: 50%"></div>
-              </div>
-            </a>
-          </li>
-          <li>
-            <a href="javascript:void(0)">
-              <h4 class="control-sidebar-subheading">
-                بخش پشتیبانی سایت
-                <span class="label label-primary pull-left">68%</span>
-              </h4>
-
-              <div class="progress progress-xxs">
-                <div class="progress-bar progress-bar-primary" style="width: 68%"></div>
-              </div>
-            </a>
-          </li>
-        </ul>
-        <!-- /.control-sidebar-menu -->
-
-      </div>
-      <!-- /.tab-pane -->
-      <!-- Stats tab content -->
-      <div class="tab-pane" id="control-sidebar-stats-tab">وضعیت</div>
-      <!-- /.tab-pane -->
-      <!-- Settings tab content -->
-      <div class="tab-pane" id="control-sidebar-settings-tab">
-        <form method="post">
-          <h3 class="control-sidebar-heading">تنظیمات عمومی</h3>
-
-          <div class="form-group">
-            <label class="control-sidebar-subheading">
-              گزارش کنترلر پنل
-              <input type="checkbox" class="pull-left" checked>
-            </label>
-
-            <p>
-              ثبت تمامی فعالیت های مدیران
-            </p>
           </div>
-          <!-- /.form-group -->
-
-          <div class="form-group">
-            <label class="control-sidebar-subheading">
-              ایمیل مارکتینگ
-              <input type="checkbox" class="pull-left" checked>
-            </label>
-
-            <p>
-              اجازه به کاربران برای ارسال ایمیل
-            </p>
-          </div>
-          <!-- /.form-group -->
-
-          <div class="form-group">
-            <label class="control-sidebar-subheading">
-              در دست تعمیرات
-              <input type="checkbox" class="pull-left" checked>
-            </label>
-
-            <p>
-              قرار دادن سایت در حالت در دست تعمیرات
-            </p>
-          </div>
-          <!-- /.form-group -->
-
-          <h3 class="control-sidebar-heading">تنظیمات گفتگوها</h3>
-
-          <div class="form-group">
-            <label class="control-sidebar-subheading">
-              آنلاین بودن من را نشان نده
-              <input type="checkbox" class="pull-left" checked>
-            </label>
-          </div>
-          <!-- /.form-group -->
-
-          <div class="form-group">
-            <label class="control-sidebar-subheading">
-              اعلان ها
-              <input type="checkbox" class="pull-left">
-            </label>
-          </div>
-          <!-- /.form-group -->
-
-          <div class="form-group">
-            <label class="control-sidebar-subheading">
-              حذف تاریخته گفتگوهای من
-              <a href="javascript:void(0)" class="text-red pull-left"><i class="fa fa-trash-o"></i></a>
-            </label>
-          </div>
-          <!-- /.form-group -->
-        </form>
-      </div>
-      <!-- /.tab-pane -->
-    </div>
-  </aside>
-  <!-- /.control-sidebar -->
-  <!-- Add the sidebar's background. This div must be placed
-       immediately after the control sidebar -->
-  <div class="control-sidebar-bg"></div>
-</div>
-<!-- ./wrapper -->
-
+        </section>
+    </form>
 <!-- jQuery 3 -->
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
 <script src="../template/bower_components/jquery/dist/jquery.min.js"></script>
 <!-- jQuery UI 1.11.4 -->
 <script src="../template/bower_components/jquery-ui/jquery-ui.min.js"></script>
@@ -772,5 +383,34 @@ include("../../functions/function.php");
 <script src="../template/dist/js/pages/dashboard.js"></script>
 <!-- AdminLTE for demo purposes -->
 <script src="../template/dist/js/demo.js"></script>
+<script src="static/js/lib/jquery-3.2.1.min.js"></script>
+<script src="static/js/app.js"></script>
+<script src="../template/dist/js/persian-date-0.1.8.min.js"></script>
+<script src="../template/dist/js/persian-datepicker-0.4.5.min.js"></script>
+<script src="../template/plugins/input-mask/jquery.inputmask.js"></script>
+<script src="../template/plugins/input-mask/jquery.inputmask.date.extensions.js"></script>
+<script src="../template/plugins/input-mask/jquery.inputmask.extensions.js"></script>
+<script>
+    $(document).ready(function () {
+        $('#birth_date').pDatepicker({
+            altField: '#tarikhAlt',
+            altFormat: 'X',
+            format: 'YYYY/MM/DD',
+            observer: true,
+            timePicker: {
+                enabled: true
+            },
+        });
+        $('#start_date').pDatepicker({
+            altField: '#tarikhAlt',
+            altFormat: 'X',
+            format: 'YYYY/MM/DD',
+            observer: true,
+            timePicker: {
+                enabled: true
+            },
+        });
+    });
+</script>
 </body>
 </html>

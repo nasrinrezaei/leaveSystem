@@ -5,9 +5,12 @@ $password="";
 $dbname="mydb";
 $dsn="mysql:host=$servername; dbname=$dbname;";
 try{
-	$Conect=new PDO($dsn,$username,$password);
-$Conect->exec("SET CHARACTER SET UTF8");
-$Conect->exec("set names utf8");
+	$Connect=new PDO($dsn,$username,$password);
+	$Connect->exec("SET CHARACTER SET UTF8");
+	$Connect->exec("set names utf8");
+	$Connect= mysqli_connect('localhost','root','');
+mysqli_select_db($Connect,'mydb');
+	return $Connect;
 }
 catch(PDOException $Error){
 	echo "Connet error in server".$Error->__toString();
@@ -15,6 +18,6 @@ catch(PDOException $Error){
 }
 
 
-//$Conect= mysqli_connect('localhost','root','');
-//mysqli_select_db($Conect,'mydb');
+$Connect= mysqli_connect('localhost','root','');
+mysqli_select_db($Connect,'mydb');
 ?>
